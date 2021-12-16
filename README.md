@@ -1,5 +1,7 @@
 # goncanode
 
+Simplify https://github.com/malikzh/NCANode usage for Go.
+
 Usage:
 ```go
     nH := goncanode.Create(entities.Options{
