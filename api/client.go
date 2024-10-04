@@ -3,33 +3,60 @@ package api
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"strings"
 )
 
-type Client struct {
-	Url string
+type IClient interface {
+	Request(ctx context.Context, method string, url string, data *bytes.Buffer) (result []byte, err error)
 }
 
-func (c *Client) Request(ctx context.Context, method string, data *bytes.Buffer) (result []byte, err error) {
-	req, err := http.NewRequestWithContext(ctx, method, c.Url, data)
+type Client struct {
+	BaseUrl    string
+	HTTPClient *http.Client
+}
+
+func (c *Client) Request(ctx context.Context, method string, url string, data *bytes.Buffer) (result []byte, err error) {
+	req, err := http.NewRequestWithContext(ctx, method, c.resolveTrimmedUrl(url), data)
 	if err != nil {
 		return
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := c.HTTPClient
+	if client == nil {
+		client = &http.Client{}
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
 
-	result, err = ioutil.ReadAll(resp.Body)
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			return
+		}
+	}(resp.Body)
+
+	result, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return
 	}
 
-	return result, nil
+	return
+}
+
+func (c *Client) resolveTrimmedUrl(url string) string {
+	p1 := strings.TrimRight(c.BaseUrl, "/")
+	p2 := strings.TrimLeft(url, "/")
+
+	if p2 == "" {
+		return p1
+	}
+
+	return p1 + "/" + p2
 }
